@@ -1,0 +1,277 @@
+        activeWebView?.goBack()
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 2.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .padding(horizontal = 8.dp)
+                ) {
+                    IconButton(onClick = { viewModel.loadUrl(tab.id, selectedSearchEngine.searchUrl.replace("search?q=%s", "").replace("?q=%s", "")) }) {
+                        Icon(Icons.Default.Home, contentDescription = "Home")
+                    }
+
+                    // Compact Address Bar
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .padding(horizontal = 4.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+                            BasicTextField(
+                                value = urlInput.let { if (it == "app://newtab") "" else it },
+                                onValueChange = { urlInput = it },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Go,
+                                    keyboardType = KeyboardType.Uri
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onGo = {
+                                        if (urlInput.isNotBlank()) {
+                                            val formattedUrl = if (urlInput.startsWith("http") || urlInput.startsWith("file://")) urlInput else {
+                                                if (urlInput.contains(".") && !urlInput.contains(" ")) "https://$urlInput"
+                                                else String.format(selectedSearchEngine.searchUrl, urlInput.replace(" ", "+"))
+                                            }
+                                            viewModel.loadUrl(tab.id, formattedUrl)
+                                        }
+                                    }
+                                ),
+                                decorationBox = { innerTextField ->
+                                    if (urlInput.isEmpty() || urlInput == "app://newtab") {
+                                        Text("Search or type URL", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    innerTextField()
+                                }
+                            )
+                            if (tab.url != "app://newtab") {
+                                IconButton(onClick = { 
+                                    viewModel.toggleBookmark(tab.url, activeWebView?.title ?: tab.title)
+                                }, modifier = Modifier.size(24.dp)) {
+                                    Icon(
+                                        if (isBookmarked) Icons.Default.Star else Icons.Outlined.Star,
+                                        contentDescription = "Bookmark",
+                                        tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .size(24.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
+                            .clickable { onOpenTabSwitcher() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val tabsCount = viewModel.tabs.collectAsStateWithLifecycle().value.size
+                        Text(
+                            tabsCount.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    var showMoreMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                        }
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("New Tab") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    viewModel.createNewTab()
+                                }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text(if (isSplitScreen) "Exit Split Screen" else "Split Screen") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    viewModel.toggleSplitScreen()
+                                }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text(if (isBookmarked) "Remove Bookmark" else "Bookmark Page") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    viewModel.toggleBookmark(tab.url, activeWebView?.title ?: tab.title)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Refresh") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    activeWebView?.reload()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Save Offline") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+                                    val file = java.io.File(dir, "offline_${System.currentTimeMillis()}.mht")
+                                    activeWebView?.saveWebArchive(file.absolutePath, false) { path ->
+                                        if (path != null) {
+                                            viewModel.saveOfflinePage(tab.url, activeWebView?.title ?: "Saved Page", path)
+                                            Toast.makeText(context, "Saved offline", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Failed to save", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("History") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onNavigate("history")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Bookmarks") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onNavigate("bookmarks")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Offline Pages") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onNavigate("offline")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Sync Clipboard") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onShowSyncDialog()
+                                    viewModel.startSyncServer()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (isFocusMode) "Disable Focus Mode" else "Enable Focus Mode") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    viewModel.toggleFocusMode()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Search Engine") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    showEngineDialog = true
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showEngineDialog) {
+            AlertDialog(
+                onDismissRequest = { showEngineDialog = false },
+                title = { Text("Select Search Engine") },
+                text = {
+                    Column {
+                        SearchEngine.values().forEach { engine ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.setSearchEngine(engine)
+                                        showEngineDialog = false
+                                    }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedSearchEngine == engine,
+                                    onClick = {
+                                        viewModel.setSearchEngine(engine)
+                                        showEngineDialog = false
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(engine.displayName)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showEngineDialog = false }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
+
+        if (tab.isLoading) {
+            LinearProgressIndicator(
+                progress = { tab.progress },
+                modifier = Modifier.fillMaxWidth().height(2.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
+
+        // Web Content
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            if (tab.url == "app://newtab") {
+                NewTabDashboard(viewModel, bookmarks, tab.id)
+            } else if (tab.url.startsWith("app://offline/")) {
+                val pageId = tab.url.removePrefix("app://offline/").toIntOrNull()
+                val allPages by viewModel.allPages.collectAsStateWithLifecycle()
+                val page = allPages.find { it.id == pageId }
+                
+                if (page != null) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { context ->
+                            WebViewPool.getWebView(context).apply {
+                                loadUrl("file://${page.filePath}")
+                            }
+                        }
+                    )
+                } else {
+                    Text("Offline page not found", modifier = Modifier.padding(16.dp))
+                }
+            } else {
+                HardenedWebView(
+                    url = tab.url,
+                    tabId = tab.id,
+                    webViewState = tab.webViewState,
+                    isFocusMode = isFocusMode,
+                    onTitleAndLoadingChange = { url, title, isLoading ->
+                        viewModel.updateTabTitleAndLoading(tab.id, url, title, isLoading)
+                    },
+                    onProgressChange = { progress ->
+                        viewModel.updateTabProgress(tab.id, progress)
+                    },

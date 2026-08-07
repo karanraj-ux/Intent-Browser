@@ -1,0 +1,8 @@
+{
+  "name": "Focus Browser",
+  "description": "A privacy-first, distraction-free browser that keeps you focused.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
