@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Focus Browser"
+rootProject.name = "Intent Browser"
 
 include(":app")

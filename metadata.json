@@ -1,6 +1,6 @@
 {
-  "name": "Focus Browser",
-  "description": "A privacy-first, distraction-free browser that keeps you focused.",
+  "name": "Intent Browser",
+  "description": "A powerful, feature-rich browser with built-in Mesh Chat, E2EE, Offline Pages, AdBlocker, and Split Screen.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
