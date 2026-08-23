@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Focus Mode Active</title>
+    <title>You are offline</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f3f0ff;
+            background-color: #f8f9fa;
             color: #343a40;
             display: flex;
             flex-direction: column;
@@ -24,12 +24,12 @@
         .icon {
             font-size: 80px;
             margin-bottom: 20px;
+            color: #adb5bd;
         }
         h1 {
             font-size: 24px;
             margin-bottom: 10px;
             font-weight: 600;
-            color: #6741d9;
         }
         p {
             font-size: 16px;
@@ -37,26 +37,45 @@
             margin-bottom: 30px;
             line-height: 1.5;
         }
+        .btn {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.2s;
+            font-weight: 500;
+        }
+        .btn:hover {
+            background-color: #0b5ed7;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
         
         @media (prefers-color-scheme: dark) {
             body {
-                background-color: #1a1625;
+                background-color: #121212;
                 color: #e0e0e0;
             }
-            h1 {
-                color: #b197fc;
+            .icon {
+                color: #555;
             }
             p {
-                color: #adb5bd;
+                color: #999;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="icon">🧘</div>
-        <h1>Focus Mode Active</h1>
-        <p>This site is blocked because Focus Mode is currently turned on. Stay focused on your goals!</p>
+        <div class="icon">🦖</div>
+        <h1>No Internet Connection</h1>
+        <p>It seems you're offline. Please check your network connection and try again.</p>
+        <button class="btn" onclick="window.location.reload()">Try Again</button>
     </div>
 </body>
 </html>

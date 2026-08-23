@@ -1,4 +1,7 @@
 package com.example.ui
+import com.example.util.DownloadState
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.filled.Download
 
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +31,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -42,6 +47,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -82,6 +88,10 @@ fun BrowserScreen(viewModel: MainViewModel, onNavigate: (String) -> Unit = {}) {
             },
             onNewTab = { 
                 viewModel.createNewTab()
+                showTabSwitcher = false
+            },
+            onNewIncognitoTab = {
+                viewModel.createNewTab(isIncognito = true)
                 showTabSwitcher = false
             },
             onCloseSwitcher = { showTabSwitcher = false }
@@ -153,6 +163,8 @@ fun BrowserContent(
                 )
             }
         }
+        
+        ActiveDownloadsOverlay(viewModel = viewModel)
     }
 
     if (showSyncDialog) {
@@ -206,8 +218,32 @@ fun BrowserContent(
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     if (meshServerIp == null) {
+                        var joinIp by remember { mutableStateOf("") }
+                        
                         Button(onClick = { viewModel.startMeshServer() }, modifier = Modifier.fillMaxWidth()) {
                             Text("Start Mesh Host")
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text("Or Join Existing Mesh:", style = MaterialTheme.typography.bodyMedium)
+                        androidx.compose.material3.OutlinedTextField(
+                            value = joinIp,
+                            onValueChange = { joinIp = it },
+                            placeholder = { Text("e.g. 192.168.1.5:8081") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                showMeshDialog = false
+                                val url = if (!joinIp.startsWith("http")) "http://$joinIp" else joinIp
+                                viewModel.createNewTab(url)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = joinIp.isNotBlank()
+                        ) {
+                            Text("Join Mesh")
                         }
                     } else {
                         Text("Share this address:", style = MaterialTheme.typography.bodyMedium)
@@ -335,42 +371,53 @@ fun BrowserTabPanel(
                         }
                         
                         // Compact Address Bar
+                        val containerColor = if (tab.isIncognito) Color(0xFF333333) else MaterialTheme.colorScheme.surfaceVariant
+                        val contentColor = if (tab.isIncognito) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(44.dp)
                                 .padding(horizontal = 4.dp, vertical = 2.dp),
                             shape = RoundedCornerShape(22.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
+                            color = containerColor,
+                            contentColor = contentColor
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(horizontal = 12.dp)
                             ) {
-                                Box {
-                                    IconButton(
-                                        onClick = { showEngineDialog = true },
-                                        modifier = Modifier.size(28.dp).padding(end = 4.dp)
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.size(24.dp).background(MaterialTheme.colorScheme.primaryContainer, androidx.compose.foundation.shape.CircleShape)
+                                if (tab.isIncognito) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "Incognito",
+                                        modifier = Modifier.size(24.dp).padding(end = 4.dp),
+                                        tint = contentColor
+                                    )
+                                } else {
+                                    Box {
+                                        IconButton(
+                                            onClick = { showEngineDialog = true },
+                                            modifier = Modifier.size(28.dp).padding(end = 4.dp)
                                         ) {
-                                            Text(
-                                                text = selectedSearchEngine.displayName.take(1),
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp
-                                            )
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier.size(24.dp).background(MaterialTheme.colorScheme.primaryContainer, androidx.compose.foundation.shape.CircleShape)
+                                            ) {
+                                                Text(
+                                                    text = selectedSearchEngine.displayName.take(1),
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
                                         }
-                                    }
-                                    DropdownMenu(
-                                        expanded = showEngineDialog,
-                                        onDismissRequest = { showEngineDialog = false }
-                                    ) {
-                                        SearchEngine.entries.forEach { engine ->
-                                            DropdownMenuItem(
-                                                text = { Text(engine.displayName) },
+                                        DropdownMenu(
+                                            expanded = showEngineDialog,
+                                            onDismissRequest = { showEngineDialog = false }
+                                        ) {
+                                            SearchEngine.entries.forEach { engine ->
+                                                DropdownMenuItem(
+                                                    text = { Text(engine.displayName) },
                                                 onClick = {
                                                     viewModel.setSearchEngine(engine)
                                                     showEngineDialog = false
@@ -379,36 +426,56 @@ fun BrowserTabPanel(
                                         }
                                     }
                                 }
-                                Box(modifier = Modifier.weight(1f)) {
-                                    BasicTextField(
-                                        value = urlInput.let { if (it == "app://newtab") "" else it },
-                                        onValueChange = { urlInput = it },
-                                        modifier = Modifier.fillMaxWidth().onFocusChanged { isUrlFocused.value = it.isFocused },
-                                        singleLine = true,
-                                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                                        keyboardOptions = KeyboardOptions(
-                                            imeAction = ImeAction.Go,
-                                            keyboardType = KeyboardType.Uri
-                                        ),
-                                        keyboardActions = KeyboardActions(
-                                            onGo = {
-                                                if (urlInput.isNotBlank()) {
-                                                    val formattedUrl = if (urlInput.startsWith("http") || urlInput.startsWith("file://")) urlInput else {
-                                                        if (urlInput.contains(".") && !urlInput.contains(" ")) "https://$urlInput"
-                                                        else String.format(selectedSearchEngine.searchUrl, urlInput.replace(" ", "+"))
-                                                    }
-                                                    viewModel.loadUrl(tab.id, formattedUrl)
+                            }
+                            Box(modifier = Modifier.weight(1f).padding(vertical = 4.dp), contentAlignment = Alignment.CenterStart) {
+                                val displayValue = if (isUrlFocused.value) {
+                                    urlInput.let { if (it == "app://newtab") "" else it }
+                                } else {
+                                    if (tab.url == "app://newtab") "" else tab.url.replace(Regex("^https?://"), "").removeSuffix("/")
+                                }
+                                
+                                BasicTextField(
+                                    value = displayValue,
+                                    onValueChange = { urlInput = it },
+                                    modifier = Modifier.fillMaxWidth().onFocusChanged { isUrlFocused.value = it.isFocused },
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = contentColor),
+                                    keyboardOptions = KeyboardOptions(
+                                        imeAction = ImeAction.Go,
+                                        keyboardType = KeyboardType.Uri
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onGo = {
+                                            if (urlInput.isNotBlank()) {
+                                                val formattedUrl = if (urlInput.startsWith("http") || urlInput.startsWith("file://")) urlInput else {
+                                                    if (urlInput.contains(".") && !urlInput.contains(" ")) "https://$urlInput"
+                                                    else String.format(selectedSearchEngine.searchUrl, urlInput.replace(" ", "+"))
+                                                }
+                                                viewModel.loadUrl(tab.id, formattedUrl)
+                                            }
+                                            isUrlFocused.value = false // attempt to clear focus visually
+                                        }
+                                    ),
+                                    decorationBox = { innerTextField ->
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                            Box(modifier = Modifier.weight(1f)) {
+                                                if (displayValue.isEmpty()) {
+                                                    Text("Search or type URL", style = MaterialTheme.typography.bodyLarge, color = contentColor.copy(alpha = 0.5f))
+                                                }
+                                                innerTextField()
+                                            }
+                                            if (isUrlFocused.value && urlInput.isNotEmpty()) {
+                                                IconButton(
+                                                    onClick = { urlInput = "" },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = "Clear", tint = contentColor.copy(alpha = 0.7f))
                                                 }
                                             }
-                                        ),
-                                        decorationBox = { innerTextField ->
-                                            if (urlInput.isEmpty() || urlInput == "app://newtab") {
-                                                Text("Search or type URL", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                            innerTextField()
                                         }
-                                    )
-                                }
+                                    }
+                                )
+                            }
                                 if (tab.url != "app://newtab") {
                                     IconButton(onClick = { 
                                         viewModel.toggleBookmark(tab.url, activeWebView?.title ?: tab.title)
@@ -474,9 +541,47 @@ fun BrowserTabPanel(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    text = { Text("Save to Scratchpad") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        activeWebView?.evaluateJavascript("(function(){ return window.getSelection().toString(); })();") { selected ->
+                                            val text = if (selected != null && selected != "\"\"" && selected != "null") selected.trim('"') else tab.url
+                                            viewModel.addNote(text)
+                                            android.widget.Toast.makeText(context, "Saved to Scratchpad", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Reader Mode") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        val readerJs = """
+                                            (function(){
+                                              const style = document.createElement('style');
+                                              style.innerHTML = `
+                                                body { background: #fdfdfd !important; color: #111 !important; font-family: serif; font-size: 20px; line-height: 1.6; max-width: 700px; margin: 0 auto; padding: 20px; }
+                                                img { max-width: 100%; height: auto; }
+                                                nav, header, footer, aside, .ad, .advertisement, iframe { display: none !important; }
+                                                * { background-color: transparent !important; color: inherit !important; font-family: inherit !important; }
+                                              `;
+                                              document.head.appendChild(style);
+                                            })();
+                                        """.trimIndent()
+                                        activeWebView?.evaluateJavascript(readerJs, null)
+                                    }
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Refresh") },
                                     onClick = {
                                         showMoreMenu = false
+                                        activeWebView?.reload()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (tab.isDesktopMode) "Mobile Site" else "Desktop Site") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        viewModel.toggleDesktopMode(tab.id)
                                         activeWebView?.reload()
                                     }
                                 )
@@ -581,6 +686,8 @@ fun BrowserTabPanel(
                         tabId = tab.id,
                         webViewState = tab.webViewState,
                         isFocusMode = isFocusMode,
+                        isIncognito = tab.isIncognito,
+                        isDesktopMode = tab.isDesktopMode,
                         onTitleAndLoadingChange = { url, title, isLoading ->
                             viewModel.updateTabTitleAndLoading(tab.id, url, title, isLoading)
                         },
@@ -689,6 +796,7 @@ fun TabSwitcherScreen(
     onCloseTab: (String) -> Unit,
     onSelectTab: (String) -> Unit,
     onNewTab: () -> Unit,
+    onNewIncognitoTab: () -> Unit,
     onCloseSwitcher: () -> Unit
 ) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -798,6 +906,15 @@ fun TabSwitcherScreen(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.Center
                 ) {
+                    FloatingActionButton(
+                        onClick = onNewIncognitoTab,
+                        containerColor = Color(0xFF333333),
+                        contentColor = Color.White,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.padding(end = 16.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = "New Incognito Tab", modifier = Modifier.size(24.dp))
+                    }
                     FloatingActionButton(
                         onClick = onNewTab,
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -978,6 +1095,66 @@ fun ClipboardContent(viewModel: MainViewModel) {
                                 viewModel.addNote(item.text)
                             }) { Icon(Icons.Default.Add, contentDescription = "Add to Notes") }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ActiveDownloadsOverlay(viewModel: MainViewModel) {
+    val downloads by viewModel.downloadManager.downloads.collectAsStateWithLifecycle()
+    val activeDownloads = downloads.filter { it.state == DownloadState.DOWNLOADING || it.state == DownloadState.PAUSED }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(
+            visible = activeDownloads.isNotEmpty(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Download, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Downloading ${activeDownloads.size} file(s)", fontWeight = FontWeight.Bold)
+                        }
+                        IconButton(onClick = { /* Could expand or hide */ }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    activeDownloads.take(2).forEach { dl ->
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(dl.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            Text("${dl.progress}%", style = MaterialTheme.typography.labelSmall)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            if (dl.state == DownloadState.DOWNLOADING) {
+                                IconButton(onClick = { viewModel.downloadManager.pause(dl.id) }, modifier = Modifier.size(24.dp)) {
+                                    Icon(Icons.Default.Pause, contentDescription = "Pause", modifier = Modifier.size(16.dp))
+                                }
+                            } else {
+                                IconButton(onClick = { viewModel.downloadManager.resume(dl.id) }, modifier = Modifier.size(24.dp)) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Resume", modifier = Modifier.size(16.dp))
+                                }
+                            }
+                            IconButton(onClick = { viewModel.downloadManager.cancel(dl.id) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = "Cancel", modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        LinearProgressIndicator(progress = { dl.progress / 100f }, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }

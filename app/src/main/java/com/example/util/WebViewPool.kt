@@ -32,21 +32,8 @@ class CustomWebView(context: Context) : WebView(context) {
 }
 
     private fun createWebView(context: Context): WebView {
-        val webView = CustomWebView(context).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.databaseEnabled = true
-            settings.setSupportZoom(true)
-            settings.builtInZoomControls = true
-            settings.displayZoomControls = false
-            settings.useWideViewPort = true
-            settings.loadWithOverviewMode = true
-            settings.mediaPlaybackRequiresUserGesture = false
-            settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-            settings.allowFileAccess = false
-            settings.allowContentAccess = false
-            settings.javaScriptCanOpenWindowsAutomatically = true
-        }
+        val webView = CustomWebView(context)
+        WebViewSettingsManager.applySettings(webView)
         return webView
     }
 }

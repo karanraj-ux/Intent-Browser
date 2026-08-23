@@ -1,32 +1,37 @@
-# Intent Browser
+# Intent Browser: The Cognitive Preservation Tool
 
-**Intent Browser** is a powerful, modern, privacy-first Android web browser built from the ground up with Jetpack Compose. Designed for speed, security, and seamless sharing, Intent Browser gives you ultimate control over your web experience.
+**Intent Browser** is not just another web browser. It is a **Local-First Research Companion** designed for deep work, rapid synthesis, and absolute digital sovereignty. 
 
-## ✨ Core Features
+While mainstream browsers are designed to keep you scrolling, Intent Browser is engineered to protect your attention, bypass hostile mobile web design, and keep your data strictly on your devices.
 
-- **🌐 Secure Mesh Chat (E2EE)**: Connect securely to peers directly over your local network. True End-to-End Encryption, PIN authentication, and ephemeral RAM-only sessions ensure zero data collection and absolute privacy. Chat safely without internet access.
-- **⚡ Split Screen Multitasking**: Browse two sites simultaneously with our intuitive split-screen view. Perfect for power users, researchers, and multitaskers.
-- **🛡️ Built-in AdBlocker**: Native AdBlocker powered by EasyList cuts through the noise, blocking ads, trackers, and malicious scripts to keep your browsing fast and distraction-free.
-- **📥 Offline Reading Vault**: Save entire web pages for offline access. Your articles are cleaned up and stored securely in a local Room Database for reading anywhere, anytime—no connection required.
-- **📝 Scratchpad & Notes**: Jot down ideas, save snippets, and manage quick notes directly within the browser using the built-in Scratchpad.
-- **📋 Universal Clipboard Sync**: Instantly sync clipboard history and push tabs between your desktop and mobile device over the local network via a lightweight, built-in server.
-- **📥 Advanced Download Manager**: Custom overlay for managing concurrent downloads, pausing, and organizing files securely on-device.
+## 🧠 Why We Built It (The Market Gap)
+Modern web design strips away your control. Websites lock you out of zooming, blast you with sticky headers, and social media creates addictive doomscrolling loops. Intent Browser acts as an exoskeleton for your attention, breaking website restrictions and returning the locus of control to the user.
+
+## ✨ Next-Gen Differentiators
+
+- **💥 The "Guilt-Trip" Focus Mode**: Instead of hard-blocking useful sites like Reddit (for devs) or YouTube (for students) which causes psychological reactance, our Focus Mode dynamically injects bright red, non-dismissible banners over the sites ("Use for study only. Do not waste time."). It breaks the autopilot scrolling loop while still allowing you to get the data you need.
+- **🌐 Serverless "AirDrop" (The Mesh Network)**: Seamlessly beam links, text, and clipboard data to a PC, Mac, or friend’s phone over local Wi-Fi. It spins up an instant E2EE tunnel. No cloud, no Google sync, no accounts required. 
+- **🛡️ Hostile Web Overrides**: Tired of websites that disable zoom or force mobile views? Intent Browser breaks their CSS and forces your preferences. Zoom up to 500% anywhere, force Desktop Mode instantly, and deploy Reader Mode to strip away sticky ads and newsletters.
+- **📝 In-Line Scratchpad**: Preserve your working memory. When you find a good quote, highlight it and save it directly to the built-in Scratchpad database. You never leave the webpage, eliminating the context-switching penalty of opening a separate Notes app.
+- **📥 Offline-First Vault**: Save entire web pages instantly for offline reading. Your data is stored locally via Room database, completely severing your reliance on an internet connection.
+- **⚡ Split Screen & AdBlocker**: Native AdBlocker cuts the noise, and built-in split-screen allows for parallel research without losing context.
 
 ## 🚀 Getting Started
 
 1. Clone the repository.
 2. Open the project in Android Studio (Minimum SDK 26).
 3. Build and run on a physical device or emulator.
-4. Access the **Mesh Chat** and **Clipboard Sync** from the browser's main menu.
+4. Access **Mesh Server** from the menu to connect to any other device on your Wi-Fi by simply typing in the provided IP address in their browser.
 
-## 🛠️ Tech Stack
+## 🛠️ Architecture & Stack
 
-- **Kotlin** & **Jetpack Compose**
-- **Room Database** (Local Persistence)
-- **Coil** (Image Loading)
-- **Coroutines & Flow** (Asynchronous operations)
-- Custom local server (NanoHTTPD style custom sockets) for Mesh Networking
+- **Kotlin** & **Jetpack Compose** (Material 3)
+- **Room Database** (Offline Pages, Scratchpad, Bookmarks)
+- **Local Sockets** (Local P2P Mesh Networking)
+- **Custom Hardened WebView Engine** (CSS injection, DOM manipulation, User-Agent spoofing)
 
-## 📄 License
+## 📄 Privacy & License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Your data belongs to you. Intent Browser contains zero telemetry, zero trackers, and zero cloud backups. It is designed to be fully self-contained. 
+
+Licensed under the MIT License.

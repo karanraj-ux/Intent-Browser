@@ -18,7 +18,9 @@ data class TabState(
     val title: String = "New Tab",
     val isLoading: Boolean = false,
     val progress: Float = 0f,
-    val webViewState: Bundle? = null
+    val webViewState: Bundle? = null,
+    val isIncognito: Boolean = false,
+    val isDesktopMode: Boolean = false
 )
 
 enum class SearchEngine(val displayName: String, val searchUrl: String) {
@@ -79,7 +81,7 @@ class MainViewModel(private val repository: AppRepository, val downloadManager: 
 
     private fun persistTabs() {
         viewModelScope.launch {
-            val entities = _tabs.value.mapIndexed { index, tabState ->
+            val entities = _tabs.value.filter { !it.isIncognito }.mapIndexed { index, tabState ->
                 com.example.data.TabEntity(
                     id = tabState.id,
                     url = tabState.url,
@@ -229,8 +231,8 @@ class MainViewModel(private val repository: AppRepository, val downloadManager: 
         com.example.util.ClipboardServer.currentClipboard = text
     }
 
-    fun createNewTab(url: String = "app://newtab") {
-        val newTab = TabState(url = url)
+    fun createNewTab(url: String = "app://newtab", isIncognito: Boolean = false) {
+        val newTab = TabState(url = url, isIncognito = isIncognito)
         _tabs.value = _tabs.value + newTab
         _activeTabId.value = newTab.id
         persistTabs()
@@ -238,35 +240,59 @@ class MainViewModel(private val repository: AppRepository, val downloadManager: 
 
     fun closeTab(tabId: String) {
         val currentTabs = _tabs.value
+        val tabToClose = currentTabs.find { it.id == tabId }
+        val isClosingIncognito = tabToClose?.isIncognito == true
+
         if (currentTabs.size <= 1) {
             _tabs.value = listOf(TabState())
             _activeTabId.value = _tabs.value.first().id
             _isSplitScreen.value = false
             _secondaryTabId.value = null
             persistTabs()
-            return
+        } else {
+            val index = currentTabs.indexOfFirst { it.id == tabId }
+            val newTabs = currentTabs.filter { it.id != tabId }
+            _tabs.value = newTabs
+            
+            if (_activeTabId.value == tabId) {
+                val newIndex = if (index >= newTabs.size) newTabs.size - 1 else index
+                _activeTabId.value = newTabs[newIndex].id
+            }
+            if (_secondaryTabId.value == tabId) {
+                _secondaryTabId.value = newTabs.firstOrNull { it.id != _activeTabId.value }?.id
+                if (_secondaryTabId.value == null) {
+                    _isSplitScreen.value = false
+                }
+            }
+            persistTabs()
         }
 
-        val index = currentTabs.indexOfFirst { it.id == tabId }
-        val newTabs = currentTabs.filter { it.id != tabId }
-        _tabs.value = newTabs
-        
-        if (_activeTabId.value == tabId) {
-            val newIndex = if (index >= newTabs.size) newTabs.size - 1 else index
-            _activeTabId.value = newTabs[newIndex].id
-        }
-        if (_secondaryTabId.value == tabId) {
-            _secondaryTabId.value = newTabs.firstOrNull { it.id != _activeTabId.value }?.id
-            if (_secondaryTabId.value == null) {
-                _isSplitScreen.value = false
+        if (isClosingIncognito && _tabs.value.none { it.isIncognito }) {
+            try {
+                if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.MULTI_PROFILE)) {
+                    val profileStore = androidx.webkit.ProfileStore.getInstance()
+                    profileStore.deleteProfile("incognito")
+                } else {
+                    android.webkit.WebStorage.getInstance().deleteAllData()
+                    val cookieManager = android.webkit.CookieManager.getInstance()
+                    cookieManager.removeAllCookies(null)
+                    cookieManager.flush()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
-        persistTabs()
     }
 
     fun switchTab(tabId: String) {
         if (_tabs.value.any { it.id == tabId }) {
             _activeTabId.value = tabId
+        }
+    }
+
+    fun toggleDesktopMode(tabId: String) {
+        _tabs.value = _tabs.value.map {
+            if (it.id == tabId) it.copy(isDesktopMode = !it.isDesktopMode) else it
         }
     }
 
@@ -278,11 +304,15 @@ class MainViewModel(private val repository: AppRepository, val downloadManager: 
     }
 
     fun updateTabTitleAndLoading(tabId: String, url: String, title: String, isLoading: Boolean) {
+        var isIncognito = false
         _tabs.value = _tabs.value.map {
-            if (it.id == tabId) it.copy(url = url, title = title, isLoading = isLoading) else it
+            if (it.id == tabId) {
+                isIncognito = it.isIncognito
+                it.copy(url = url, title = title, isLoading = isLoading)
+            } else it
         }
         persistTabs()
-        if (!isLoading && url.startsWith("http")) {
+        if (!isLoading && url.startsWith("http") && !isIncognito) {
             viewModelScope.launch { repository.insertHistory(url, title) }
         }
     }

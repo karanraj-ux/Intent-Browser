@@ -1,6 +1,6 @@
 {
   "name": "Intent Browser",
-  "description": "A powerful, feature-rich browser with built-in Mesh Chat, E2EE, Offline Pages, AdBlocker, and Split Screen.",
+  "description": "The offline-first focus browser for deep work. Features serverless Mesh syncing, hostile web overrides, an in-line scratchpad, and guilt-trip distraction blockers.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

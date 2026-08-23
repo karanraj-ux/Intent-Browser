@@ -44,6 +44,8 @@ fun HardenedWebView(
     tabId: String,
     webViewState: Bundle?,
     isFocusMode: Boolean,
+    isIncognito: Boolean = false,
+    isDesktopMode: Boolean = false,
     onTitleAndLoadingChange: (String, String, Boolean) -> Unit,
     onProgressChange: (Float) -> Unit,
     onSaveState: (Bundle) -> Unit,
@@ -54,6 +56,31 @@ fun HardenedWebView(
 ) {
     val context = LocalContext.current
     var uploadMessage by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
+    var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
+    var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
+    
+    var pendingGeoCallback by remember { mutableStateOf<GeolocationPermissions.Callback?>(null) }
+    var pendingGeoOrigin by remember { mutableStateOf<String?>(null) }
+    
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        if (results.all { it.value }) {
+            pendingGeoCallback?.invoke(pendingGeoOrigin, true, false)
+        } else {
+            pendingGeoCallback?.invoke(pendingGeoOrigin, false, false)
+        }
+        pendingGeoCallback = null
+        pendingGeoOrigin = null
+    }
+
+    var pendingPermissionRequest by remember { mutableStateOf<PermissionRequest?>(null) }
+    val hardwarePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        if (results.all { it.value }) {
+            pendingPermissionRequest?.grant(pendingPermissionRequest?.resources)
+        } else {
+            pendingPermissionRequest?.deny()
+        }
+        pendingPermissionRequest = null
+    }
     
     val fileChooserLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         if (uris.isNotEmpty()) {
@@ -67,16 +94,27 @@ fun HardenedWebView(
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
-            WebViewPool.getWebView(ctx).apply {
+            val webView = if (isIncognito) {
+                WebView(ctx).apply {
+                    if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.MULTI_PROFILE)) {
+                        try {
+                            val profileStore = androidx.webkit.ProfileStore.getInstance()
+                            val profile = profileStore.getOrCreateProfile("incognito")
+                            androidx.webkit.WebViewCompat.setProfile(this, profile.name)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    com.example.util.WebViewSettingsManager.applySettings(this)
+                }
+            } else {
+                WebViewPool.getWebView(ctx)
+            }
+            
+            webView.apply {
                 if (webViewState != null) {
                     restoreState(webViewState)
                 }
-                
-                settings.setSupportMultipleWindows(true)
-                settings.javaScriptCanOpenWindowsAutomatically = true
-                settings.setGeolocationEnabled(true)
-                settings.allowFileAccess = false
-                settings.allowContentAccess = false
                 
                 webViewClient = object : WebViewClient() {
                     override fun onPageStarted(view: WebView?, urlStr: String?, favicon: Bitmap?) {
@@ -90,6 +128,21 @@ fun HardenedWebView(
 
                                                             override fun onPageFinished(view: WebView?, urlStr: String?) {
                         super.onPageFinished(view, urlStr)
+                        
+                        // Force Enable Zoom (Accessibility)
+                        val forceZoomJs = "(function() { " +
+                            "  var meta = document.querySelector('meta[name=\"viewport\"]'); " +
+                            "  if (meta) { " +
+                            "    meta.content = meta.content.replace(/user-scalable=no/ig, 'user-scalable=yes').replace(/maximum-scale=[0-9\\.]+/ig, 'maximum-scale=5.0'); " +
+                            "  } else { " +
+                            "    meta = document.createElement('meta'); " +
+                            "    meta.name = 'viewport'; " +
+                            "    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes'; " +
+                            "    document.head.appendChild(meta); " +
+                            "  } " +
+                            "})();"
+                        view?.evaluateJavascript(forceZoomJs, null)
+
                         urlStr?.let {
                             val title = view?.title ?: it
                             onTitleAndLoadingChange(it, title, false)
@@ -100,6 +153,10 @@ fun HardenedWebView(
                                 
                                 if (it.contains("youtube.com")) {
                                     js.append("style.innerHTML += 'ytd-rich-grid-renderer, ytd-watch-next-secondary-results-renderer, #shorts-container { display: none !important; } ';")
+                                    js.append("var banner = document.createElement('div'); banner.innerText = 'Focus Mode Active: Use YouTube for study only. Do not waste time.'; banner.style.cssText = 'position:fixed; top:0; left:0; width:100%; background:#d32f2f; color:#fff; text-align:center; padding:10px; z-index:999999; font-weight:bold; font-family:sans-serif;'; document.body.appendChild(banner);")
+                                }
+                                if (it.contains("reddit.com")) {
+                                    js.append("var banner = document.createElement('div'); banner.innerText = 'Focus Mode Active: Use Reddit as a data source only. Avoid doomscrolling.'; banner.style.cssText = 'position:fixed; top:0; left:0; width:100%; background:#d32f2f; color:#fff; text-align:center; padding:10px; z-index:999999; font-weight:bold; font-family:sans-serif;'; document.body.appendChild(banner);")
                                 }
                                 if (it.contains("instagram.com")) {
                                     js.append("style.innerHTML += 'main[role=\"main\"] > div > div > div > div:first-child { display: none !important; } ';")
@@ -119,6 +176,15 @@ fun HardenedWebView(
                             }
                             
                             onPageFinishedListener?.invoke(it, view!!)
+                        }
+                    }
+
+                    override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: android.webkit.WebResourceError?) {
+                        super.onReceivedError(view, request, error)
+                        if (request?.isForMainFrame == true) {
+                            if (error?.errorCode == WebViewClient.ERROR_HOST_LOOKUP || error?.errorCode == WebViewClient.ERROR_CONNECT || error?.errorCode == WebViewClient.ERROR_TIMEOUT) {
+                                view?.loadUrl("file:///android_asset/offline.html")
+                            }
                         }
                     }
 
@@ -143,6 +209,9 @@ fun HardenedWebView(
                             } else {
                                 android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(urlStr))
                             }
+                            if (AdBlocker.isAdOrTracker(intent.dataString ?: "")) {
+                                return true // Block tracking intent
+                            }
                             intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                             view?.context?.startActivity(intent)
                             true
@@ -154,16 +223,33 @@ fun HardenedWebView(
                                         override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                         val requestUrl = request?.url?.toString()
                         if (requestUrl != null) {
+                            if (requestUrl.contains("ai.studio") || requestUrl.contains("gemini.google.com") || requestUrl.contains("wayback")) {
+                                return super.shouldInterceptRequest(view, request)
+                            }
                             if (isFocusMode) {
                                 if (requestUrl.endsWith(".mp4") || requestUrl.endsWith(".webm") || requestUrl.contains("youtube.com/shorts")) {
                                     return WebResourceResponse("text/plain", "UTF-8", java.io.ByteArrayInputStream("".toByteArray()))
                                 }
                             }
                             if (AdBlocker.isAdOrTracker(requestUrl) || AdBlocker.isAdultContent(requestUrl) || requestUrl.contains("pornhub.com") || requestUrl.contains("xvideos.com")) {
+                                if (request.isForMainFrame) {
+                                    try {
+                                        return WebResourceResponse("text/html", "UTF-8", ctx.assets.open("offline.html"))
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
+                                }
                                 return WebResourceResponse("text/plain", "UTF-8", java.io.ByteArrayInputStream("".toByteArray()))
                             }
                         }
                         return super.shouldInterceptRequest(view, request)
+                    }
+
+                    override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
+                        super.onReceivedHttpError(view, request, errorResponse)
+                        if (request?.isForMainFrame == true && errorResponse?.statusCode ?: 200 >= 400) {
+                            view?.loadUrl("file:///android_asset/offline.html")
+                        }
                     }
 
                     override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
@@ -194,19 +280,40 @@ fun HardenedWebView(
 
                     override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
                         super.onShowCustomView(view, callback)
-                        // Advanced Fullscreen Video Handling could be implemented here
+                        fullscreenView = view
+                        customViewCallback = callback
                     }
 
                     override fun onHideCustomView() {
                         super.onHideCustomView()
+                        fullscreenView = null
+                        customViewCallback = null
                     }
                     
                     override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback?) {
-                        callback?.invoke(origin, true, false)
+                        pendingGeoOrigin = origin
+                        pendingGeoCallback = callback
+                        permissionLauncher.launch(arrayOf(
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                        ))
                     }
 
                     override fun onPermissionRequest(request: PermissionRequest?) {
-                        request?.grant(request.resources)
+                        pendingPermissionRequest = request
+                        val androidPermissions = mutableListOf<String>()
+                        if (request?.resources?.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE) == true) {
+                            androidPermissions.add(android.Manifest.permission.CAMERA)
+                        }
+                        if (request?.resources?.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE) == true) {
+                            androidPermissions.add(android.Manifest.permission.RECORD_AUDIO)
+                        }
+                        if (androidPermissions.isNotEmpty()) {
+                            hardwarePermissionLauncher.launch(androidPermissions.toTypedArray())
+                        } else {
+                            request?.grant(request.resources)
+                            pendingPermissionRequest = null
+                        }
                     }
 
                     override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: android.os.Message?): Boolean {
@@ -271,6 +378,15 @@ fun HardenedWebView(
         update = { view ->
             onWebViewCreated(view)
             
+            // Apply Desktop Mode
+            if (isDesktopMode) {
+                view.settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+                view.settings.useWideViewPort = true
+                view.settings.loadWithOverviewMode = true
+            } else {
+                view.settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36 IntentBrowser/1.0"
+            }
+            
             // Apply Focus Mode logic
             view.settings.loadsImagesAutomatically = !isFocusMode
             view.settings.blockNetworkImage = isFocusMode
@@ -283,6 +399,34 @@ fun HardenedWebView(
             val bundle = Bundle()
             view.saveState(bundle)
             onSaveState(bundle)
+            if (isIncognito) {
+                view.destroy()
+            } else {
+                WebViewPool.recycle(view)
+            }
         }
     )
+
+    if (fullscreenView != null) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = {
+                customViewCallback?.onCustomViewHidden()
+                fullscreenView = null
+                customViewCallback = null
+            },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { 
+                    val parent = fullscreenView?.parent as? android.view.ViewGroup
+                    parent?.removeView(fullscreenView)
+                    fullscreenView!! 
+                }
+            )
+        }
+    }
 }
