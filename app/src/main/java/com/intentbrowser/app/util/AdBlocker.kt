@@ -110,8 +110,7 @@ object AdBlocker {
 
                 val file = java.io.File(context.filesDir, "hosts.txt")
                 val lastModified = file.lastModified()
-                val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
-                
+
                 if (!file.exists() || lastModified < oneWeekAgo) {
                     val url = java.net.URL("https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts")
                     val connection = url.openConnection()

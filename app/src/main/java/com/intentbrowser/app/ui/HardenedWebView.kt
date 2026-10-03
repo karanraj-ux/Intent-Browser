@@ -660,17 +660,15 @@ fun HardenedWebView(
                         }
                         val newWebView = WebView(view.context)
                         WebViewSettingsManager.applySettings(newWebView)
-                        newWebView.webViewClient = object : WebViewClient() {
-                            override fun onCloseWindow(w: WebView?) {
-                                super.onCloseWindow(w)
-                                popupWebView = null
-                                w?.destroy()
-                            }
-                        }
                         newWebView.webChromeClient = object : WebChromeClient() {
                             override fun onReceivedTitle(v: WebView?, title: String?) {
                                 super.onReceivedTitle(v, title)
                                 popupTitle = title ?: ""
+                            }
+                            override fun onCloseWindow(w: WebView?) {
+                                super.onCloseWindow(w)
+                                popupWebView = null
+                                w?.destroy()
                             }
                         }
                         val transport = resultMsg?.obj as? WebView.WebViewTransport

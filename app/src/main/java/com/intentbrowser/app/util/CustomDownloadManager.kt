@@ -261,7 +261,7 @@ class CustomDownloadManager(
             resolver.openOutputStream(targetUri, if (resumed) "wa" else "w")!!.use { out ->
                 val input = body.byteStream()
                 val buffer = ByteArray(32 * 1024)
-                var n: Int
+                var n = 0
                 var current = downloaded
                 var lastUi = 0L
                 var lastNotif = 0L
@@ -338,7 +338,7 @@ class CustomDownloadManager(
                 raf.seek(if (resp.code == 206) downloaded else 0)
                 val input = body.byteStream()
                 val buffer = ByteArray(32 * 1024)
-                var n: Int
+                var n = 0
                 var current = raf.length()
                 if (resp.code != 206) current = 0
                 var lastUi = 0L
