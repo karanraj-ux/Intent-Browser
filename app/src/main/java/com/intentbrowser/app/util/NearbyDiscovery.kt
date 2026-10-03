@@ -99,8 +99,8 @@ object NearbyDiscovery {
             serviceType = SERVICE_TYPE
             this.port = port
             // TXT record: only talk to our own app, and allow version gating later.
-            setAttribute("app", APP_ID.toByteArray())
-            setAttribute("v", "2".toByteArray())
+            setAttribute("app", APP_ID)
+            setAttribute("v", "2")
         }
         val listener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(info: NsdServiceInfo) {
