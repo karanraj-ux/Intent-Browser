@@ -238,9 +238,9 @@ fun HardenedWebView(
                 WebView(ctx).apply {
                     if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
                         try {
-                            val profile = androidx.webkit.ProfileStore.getInstance()
-                                .getOrCreateProfile("incognito")
-                            androidx.webkit.WebViewCompat.setProfile(this, profile)
+                            // webkit 1.11: setProfile takes the profile NAME (String);
+                            // the Profile-object overload only exists in 1.12+.
+                            androidx.webkit.WebViewCompat.setProfile(this, "incognito")
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }

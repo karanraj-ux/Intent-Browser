@@ -37,6 +37,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -77,6 +79,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.geometry.Offset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -156,7 +159,6 @@ fun BrowserContent(
 
     var followTarget by remember { mutableStateOf<com.intentbrowser.app.util.NearbyDevice?>(null) }
     var followPinInput by remember { mutableStateOf("") }
-    val contentContext = androidx.compose.ui.platform.LocalContext.current
     val sharedClipboard by viewModel.sharedClipboard.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -616,11 +618,11 @@ fun BrowserTabPanel(
                         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     try {
-                        contentContext.startActivity(
+                        context.startActivity(
                             android.content.Intent.createChooser(openIntent, "Open file")
                         )
                     } catch (_: Exception) {
-                        Toast.makeText(contentContext, "No app can open this file", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "No app can open this file", Toast.LENGTH_SHORT).show()
                     }
                     viewModel.clearDropFileReceived()
                 }) { Text("Open") }
